@@ -1,26 +1,33 @@
 {
   "format": 1,
   "restore": {
-    "/home/coldi/RiderProjects/ServerPractic/ServerPractic/ServerPractic.csproj": {}
+    "C:\\Users\\student\\RiderProjects\\PracticServer\\ServerPractic\\ServerPractic.csproj": {}
   },
   "projects": {
-    "/home/coldi/RiderProjects/ServerPractic/ServerPractic/ServerPractic.csproj": {
+    "C:\\Users\\student\\RiderProjects\\PracticServer\\ServerPractic\\ServerPractic.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/coldi/RiderProjects/ServerPractic/ServerPractic/ServerPractic.csproj",
+        "projectUniqueName": "C:\\Users\\student\\RiderProjects\\PracticServer\\ServerPractic\\ServerPractic.csproj",
         "projectName": "ServerPractic",
-        "projectPath": "/home/coldi/RiderProjects/ServerPractic/ServerPractic/ServerPractic.csproj",
-        "packagesPath": "/home/coldi/.nuget/packages/",
-        "outputPath": "/home/coldi/RiderProjects/ServerPractic/ServerPractic/obj/",
+        "projectPath": "C:\\Users\\student\\RiderProjects\\PracticServer\\ServerPractic\\ServerPractic.csproj",
+        "packagesPath": "C:\\Users\\student\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\student\\RiderProjects\\PracticServer\\ServerPractic\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "/home/coldi/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\student\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
-          "/usr/lib/dotnet/library-packs": {},
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "http://192.168.200.81:8081/repository/nuget.org-proxy/index.json": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -39,19 +46,33 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
           "targetAlias": "net10.0",
           "dependencies": {
+            "Bogus": {
+              "target": "Package",
+              "version": "[35.6.5, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[10.0.8, )"
+            },
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[10.0.8, )"
             },
             "Microsoft.EntityFrameworkCore": {
               "target": "Package",
-              "version": "[10.0.8, )"
+              "version": "[9.0.16, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.16, )"
             },
             "Newtonsoft.Json": {
               "target": "Package",
@@ -60,6 +81,22 @@
             "Pomelo.EntityFrameworkCore.MySql": {
               "target": "Package",
               "version": "[9.0.0, )"
+            },
+            "SignalRSwaggerGen": {
+              "target": "Package",
+              "version": "[4.9.0, )"
+            },
+            "Swashbuckle.AspNetCore.Swagger": {
+              "target": "Package",
+              "version": "[10.1.7, )"
+            },
+            "Swashbuckle.AspNetCore.SwaggerGen": {
+              "target": "Package",
+              "version": "[10.1.7, )"
+            },
+            "Swashbuckle.AspNetCore.SwaggerUI": {
+              "target": "Package",
+              "version": "[10.1.7, )"
             }
           },
           "imports": [
@@ -81,7 +118,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/10.0.103/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

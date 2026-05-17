@@ -7,7 +7,7 @@ public class Message
 {
     public Guid Id { get; set; }
     [Required, MaxLength(500)] public string Text { get; set; } = string.Empty;
-    [Required, ForeignKey(nameof(Sender))] public ulong SenderId { get; set; }
+    [Required, ForeignKey(nameof(Sender)), MaxLength(60)] public string SenderLogin { get; set; } = string.Empty;
     [Required, ForeignKey(nameof(Chat))] public ulong ChatId { get; set; }
     [Required] public DateTimeOffset Timestamp { get; set; }
 

@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ServerPractic.Model;
 
-[PrimaryKey(nameof(UserId), nameof(ChatId))]
+[PrimaryKey(nameof(UserLogin), nameof(ChatId))]
 public class ChatMember
 {
     [Required, ForeignKey(nameof(Chat))] public ulong ChatId { get; set; }
-    [Required, ForeignKey(nameof(User))] public ulong UserId { get; set; }
+    [Required, ForeignKey(nameof(User)), MaxLength(40)] public string UserLogin { get; set; } = string.Empty;
 
     public virtual User User { get; set; } = null!;
     public virtual Chat Chat { get; set; } = null!;
