@@ -20,35 +20,44 @@ namespace ServerPractice2026Spring.Hubs;
 
 [SignalRHub(Options.HubPath, AutoDiscover.MethodsAndParams, hubMethodsScan: HubMethodsScan.Default)]
 [Authorize]
-public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : Hub
+public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, ILogger<ChatHub> logger) : Hub
 {
     private readonly SecurityKey _publicKey = KeyHelper.BuildRsaSigningKey(Options.RSA);
-
+    private string ConnectionString => GetCurrentConnectionId().ToString() ?? $"Unauthorized connection ({Context.ConnectionId})";
+    
     public async Task<Response> GetMessages(ulong chatId)
     {
         var login = GetCurrentUserLogin();
         if (!await db.ChatMembers.AnyAsync(c => c.ChatId == chatId
-                                                && c.UserLogin == login)) 
+                                                && c.UserLogin == login))
+        {
+            logger.LogInformation("{ConnectionId} tried pulling messages from chat {chatId}, but is not member of it", ConnectionString, chatId);
             return ToBadResponse("You are not a member of this chat", 403);
+        }
         
         var messages = await db.Messages
             .Where(m => m.ChatId == chatId)
             .OrderByDescending(m => m.Timestamp)
             .ToArrayAsync();
+        logger.LogInformation("{ConnectionId} pulled {count} messages from chat {chatId}", ConnectionString, messages.Length, chatId);
         return ToResponseWithData(messages);
     }
     public async Task<Response> SendMessage(string content, ulong chatId)
     {
-        if (string.IsNullOrEmpty(content))
+        if (string.IsNullOrWhiteSpace(content))
         {
+            logger.LogInformation("{ConnectionId} tried send message to chat {chatId} with empty ('{content}') content", ConnectionString, chatId, content);
             return ToBadResponse("Message text should not be empty", 400);
         }
 
-        var userId = GetCurrentUserLogin();
+        var userLogin = GetCurrentUserLogin()!;
 
         if (!await db.ChatMembers.AnyAsync(cm => cm.ChatId == chatId
-                                                 && cm.UserLogin == userId))
+                                                 && cm.UserLogin == userLogin))
+        {
+            logger.LogInformation("{ConnectionId} tried send message to chat {chatId}, but is not  member of it", ConnectionString, chatId);
             return ToBadResponse("You are not a member of this chat", 403);
+        }
         
         
         var message = (await db.Messages.AddAsync(new Message()
@@ -57,11 +66,12 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
             Text = content.Length > 500 
                 ? content.Remove(499, content.Length - 500) 
                 : content,
-            SenderLogin = userId!,
+            SenderLogin = userLogin,
             Timestamp = DateTimeOffset.UtcNow,
             ChatId = chatId
         })).Entity;
-
+        await db.SaveChangesAsync();
+        logger.LogInformation("{ConnectionId} tried send message to chat {chatId}", ConnectionString, chatId);
         return ToResponseWithData(message);
     }
 
@@ -69,7 +79,14 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
     {
         var response = await SendMessage(content, chatId);
         if ((int)response.StatusCode < 400)
-            await SendMessagesToRandom(chatId);
+        {
+            logger.LogInformation("{ConnectionId} sent ai message to chat {chatId}. Starting sending messages to random user...", ConnectionString, chatId);
+            await SendMessagesToRandom(chatId, GetCurrentUserLogin());
+        }
+        else
+        {
+            logger.LogInformation("{ConnectionId} sent ai message to chat {chatId}, but failed because of '{message}' with statusCode: {statusCode}", ConnectionString, chatId, response.Message, response.StatusCode);
+        }
         return response;
     }
 
@@ -79,18 +96,27 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         var passHash = SHA3_256.HashData(Encoding.UTF8.GetBytes(password));
         var passHashStr = Encoding.UTF8.GetString(passHash);
         
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login && u.Password == passHashStr);
-        
-        if (user is null) return ToBadResponse("Wrong pair login/password", 401);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login 
+                                                           && u.Password == passHashStr);
+
+        if (user is null)
+        {
+            logger.LogInformation("{ConnectionId} tried to log in, but failed", ConnectionString);
+            return ToBadResponse("Wrong pair login/password", 401);
+        }
         
         var token = GenerateToken(user.Login, DateTimeOffset.UtcNow.AddMinutes(20));
+        logger.LogInformation("{ConnectionId} received authorize token", ConnectionString);
         return ToResponseWithData(token, "Authenticated successfully");
     }
     [AllowAnonymous]
     public async Task<Response> Register(string login, string password)
     {
-        if (await db.Users.AnyAsync(u => u.Login == login)) 
+        if (await db.Users.AnyAsync(u => u.Login == login))
+        {
+            logger.LogInformation("{ConnectionId} tried to register, but failed because of duplicate login", ConnectionString);
             return ToBadResponse("Login already registered", 403);
+        }
         
         var passHash = SHA3_256.HashData(Encoding.UTF8.GetBytes(password));
         var passHashStr = Encoding.UTF8.GetString(passHash);
@@ -101,12 +127,18 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         };
         await db.Users.AddAsync(user);
         await db.SaveChangesAsync();
+        logger.LogInformation("{ConnectionId} registered successfully under login: {login}", ConnectionString, login);
         return ToResponseWithData(true, "Registered successfully");
     }
 
     
     public async Task<Response> CreateChat(string chatTitle, string[]? memberLogins = null)
     {
+        if (string.IsNullOrWhiteSpace(chatTitle) || chatTitle.Length < 1)
+        {
+            logger.LogInformation("{ConnectionId} tried creating chat, but provided empty chatTitle ('{title}')", ConnectionString, chatTitle);
+            return ToBadResponse("Chat title should be at least 1 character", 400);
+        }
         var chat = new Chat()
         {
             Title = chatTitle,
@@ -114,92 +146,127 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         
         chat = (await db.Chats.AddAsync(chat)).Entity;
 
-        var userId = GetCurrentUserLogin()!;
+        var userLogin = GetCurrentUserLogin()!;
         await db.ChatMembers.AddAsync(new ChatMember()
         {
             ChatId = chat.Id,
-            UserLogin = userId
+            UserLogin = userLogin
         });
+        var connections = idHandler.GetConnectionIds(userLogin);
+
+        if (connections is not null && connections.Count != 0)
+        {
+            foreach (var connection in connections)
+            {
+                await Groups.AddToGroupAsync(connection.ToString(), chat.Id.ToString());
+            }
+        }
         
-        await Groups.AddToGroupAsync(userId, chat.Id.ToString());
-
-
         if (memberLogins is null || memberLogins.Length <= 0)
         {
             await db.SaveChangesAsync();
+            logger.LogInformation("{ConnectionId} created chat {chatId} with {count} member", ConnectionString, chat.Id, 1);
             return ToResponseWithData(chat, "Chat created successfully", (HttpStatusCode)201);
         }
         
-        foreach (var memberId in memberLogins)
+        foreach (var memberLogin in memberLogins)
         {
             await db.ChatMembers.AddAsync(new ChatMember()
             {
                 ChatId = chat.Id,
-                UserLogin = memberId
+                UserLogin = memberLogin
             });
-            Clients.User(memberId);
-            await Groups.AddToGroupAsync(memberId, chat.Id.ToString());
+            var memberConnections = idHandler.GetConnectionIds(memberLogin);
+            
+            if (memberConnections is null || memberConnections.Count == 0) continue;
+            foreach (var connection in memberConnections)
+            {
+                await Groups.AddToGroupAsync(connection.ToString(), chat.Id.ToString());
+            }
         }
 
         await db.SaveChangesAsync();
-
+        logger.LogInformation("{ConnectionId} created chat {chatId} with {count} members", ConnectionString, chat.Id, memberLogins.Length + 1);
         return ToResponseWithData(chat, "Chat created successfully", (HttpStatusCode)201);
     }
 
-    public async Task<Response> AddChatMembers(ulong chatId, string[] logins)
+    public async Task<Response> AddChatMembers(ulong chatId, List<string> logins)
     {
-        if (logins.Length == 0)
+        if (logins.Count == 0)
         {
+            logger.LogInformation("{ConnectionId} tried to add chat members to chat {chatId}, but provided empty logins", ConnectionString, chatId);
             return ToBadResponse("List of members is empty", 400);
         }
 
         var userLogin = GetCurrentUserLogin();
         if (!await db.ChatMembers.AnyAsync(c => c.ChatId == chatId
                                                 && c.UserLogin == userLogin))
-            return ToBadResponse("You are not a member of this chat", 403);
-        
-        
-        foreach (var login in logins)
         {
+            logger.LogInformation("{ConnectionId} tried to add chat members, while not being themselves a member of chat {chatId}", ConnectionString, chatId);
+            return ToBadResponse("You are not a member of this chat", 403);
+        }
+
+
+        for (int i = 0; i < logins.Count; i++)
+        {
+            if (await db.Users.AnyAsync(u => u.Login == logins[i]))
+            {
+                logins.Remove(logins[i]);
+                continue;
+            }
+            
             await db.ChatMembers.AddAsync(new ChatMember()
             {
                 ChatId = chatId,
-                UserLogin = login
+                UserLogin = logins[i]
             });
         }
 
+        if (logins.Count == 0)
+        {
+            logger.LogInformation("{ConnectionId} tried to add chat members to chat {chatId}, but provided unexistent logins", ConnectionString, chatId);
+            return ToBadResponse("List of logins is empty", 400);
+        }
+        
         await db.SaveChangesAsync();
-        await AddRangeToGroup(logins, chatId.ToString());
+        await AddRangeToGroup(logins.ToArray(), chatId.ToString());
 
-        return ToBadResponse("You are not a member of this chat", 403);
+        logger.LogInformation("{ConnectionId} added {count} members to chat {chatId}",  ConnectionString, logins.Count, chatId);
+        return ToResponseWithData(true, "Successfully added members to chat", (HttpStatusCode)201);
     }
-
     
     
-    private async Task SendMessagesToRandom(ulong chatId)
+    private async Task SendMessagesToRandom(ulong chatId, string? removeLogin = null)
     {
         var userLogins = faker.Random.Shuffle(await 
             db.ChatMembers
                 .Where(c => c.ChatId == chatId)
                 .Select(c => c.UserLogin)
                 .ToArrayAsync()).ToList();
+        logger.LogInformation("Starting sending messages to random member of chat {chatId} (members: {count})", chatId, userLogins.Count);
 
-        userLogins.Remove(GetCurrentUserLogin()!);
+        if (!string.IsNullOrWhiteSpace(removeLogin))
+        {
+            userLogins.Remove(removeLogin);
+            logger.LogInformation("Removed login of sender");
+        }
         
         foreach (var userLogin in userLogins)
         {
             var userIds = idHandler.GetConnectionIds(userLogin);
             if (userIds is null) continue;
-            var userId = faker.PickRandom(userIds);
+            var userId = faker.PickRandom(userIds).ToString();
             
-            var user = Clients.User(userId.ToString()!);
+            var user = Clients.User(userId);
             
             var messages = await db.Messages
                 .Where(m => m.ChatId == chatId)
                 .OrderByDescending(m => m.Timestamp)
                 .Take(faker.Random.Byte(20, 30))
                 .ToListAsync();
+            logger.LogInformation("Sending {count} messages to {ConnectionId}", messages.Count, userId);
             await user.SendAsync("GenerateResponse", messages);
+            logger.LogInformation("Sent {count} messages to {ConnectionId}", messages.Count, userId);
             break;
         }
     }
@@ -242,6 +309,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
 
     private async Task AddRangeToGroup(string[] logins, string groupName)
     {
+        logger.LogInformation("Starting adding {membersCount} to group {groupName}", logins.Length, groupName);
         foreach (var login in logins)
         {
             var connections = idHandler.GetConnectionIds(login);
@@ -249,6 +317,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
             foreach (var connection in connections)
             {
                 await Groups.AddToGroupAsync(connection.ToString(), groupName);
+                logger.LogInformation("Connection {ConnectionId} added to group {groupName}", connection, groupName);
             }
         }
     }
@@ -257,6 +326,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         HttpStatusCode statusCode = HttpStatusCode.OK)
     {
         var returnData = JsonConvert.SerializeObject(data);
+        
         if (string.IsNullOrEmpty(message))
         {
             var type = typeof(T);
@@ -299,6 +369,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
                 .Select(c => c.ChatId)
                 .ToArrayAsync();
 
+            logger.LogInformation("{ConnectionId} logged in. Starting to add them to {count} groups", connectionId, chatIdsWhereUserIn.Length);
             foreach (var chatId in chatIdsWhereUserIn)
             {
                 await Groups.AddToGroupAsync(connectionId!, chatId.ToString());
