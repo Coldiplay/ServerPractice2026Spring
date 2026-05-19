@@ -25,4 +25,7 @@ internal static class Options
     internal static readonly string RSA;
     internal static readonly string Issuer;
     internal static readonly string Audience;
+
+    internal const string HubName = "chatHub";
+    internal const string HubPath = "/chatHub";
 }

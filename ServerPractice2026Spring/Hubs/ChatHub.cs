@@ -6,15 +6,19 @@ using System.Security.Cryptography;
 using System.Text;
 using Bogus;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using ServerPractice2026Spring.Model;
 using ServerPractice2026Spring.Tools;
+using SignalRSwaggerGen.Attributes;
+using SignalRSwaggerGen.Enums;
 
 namespace ServerPractice2026Spring.Hubs;
 
+[SignalRHub(Options.HubPath, AutoDiscover.MethodsAndParams, hubMethodsScan: HubMethodsScan.Default)]
 [Authorize]
 public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : Hub
 {
@@ -283,6 +287,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         };
     }
 
+    [ApiExplorerSettings(IgnoreApi = true)]
     public override async Task OnConnectedAsync()
     {
         var connectionId = Context.User?.Claims.FirstOrDefault(c => c.Type == "GUID")?.Value;
@@ -303,6 +308,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler) : 
         await base.OnConnectedAsync();
     }
 
+    [ApiExplorerSettings(IgnoreApi = true)]
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         var connectionId = GetCurrentConnectionId();

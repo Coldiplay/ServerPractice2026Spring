@@ -3,23 +3,29 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using ServerPractice2026Spring;
 using ServerPractice2026Spring.Hubs;
 using ServerPractice2026Spring.MiddleWares;
 using ServerPractice2026Spring.Model;
 using ServerPractice2026Spring.Tools;
+using SignalRSwaggerGen.Enums;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-//builder.Services.AddControllers();
+builder.Services.AddControllers();
 builder.Services.AddDbContext<ChatDbContext>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddSignalR();
 builder.Services.AddSwaggerGen(options => {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Some API v1", Version = "v1" });
-    options.AddSignalRSwaggerGen();
+    options.AddSignalRSwaggerGen(c =>
+    {
+        c.IgnoreMethodsInheritedFromType(typeof(Hub));
+        c.AutoDiscover = AutoDiscover.MethodsAndParams;
+        c.HubMethodsScan = HubMethodsScan.Default;
+    });
+    
     options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.Http,
@@ -79,8 +85,7 @@ app.UseHttpsRedirection();
 app.UseMiddleware<GlobalExceptionMiddleWare>();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapHub<ChatHub>("/chathub");
-
+app.MapHub<ChatHub>(Options.HubPath);
 app.MapControllers();
 
 app.Run();
