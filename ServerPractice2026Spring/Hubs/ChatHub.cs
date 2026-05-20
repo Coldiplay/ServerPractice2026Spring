@@ -62,7 +62,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         
         var message = (await db.Messages.AddAsync(new Message()
         {
-            Id = Guid.CreateVersion7(),
+            Id = Guid.NewGuid(),
             Text = content.Length > 500 
                 ? content.Remove(499, content.Length - 500) 
                 : content,
@@ -72,7 +72,10 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         })).Entity;
         await db.SaveChangesAsync();
         logger.LogInformation("{ConnectionId} tried send message to chat {chatId}", ConnectionString, chatId);
+        
+        await Clients.OthersInGroup(chatId.ToString()).SendAsync("ReceiveMessage", message);
         return ToResponseWithData(message);
+        
     }
 
     public async Task<Response> SendMessageAi(string content, ulong chatId)
