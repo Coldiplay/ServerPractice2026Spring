@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-//builder.Services.AddControllers();
+builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<ChatDbContext>();
@@ -87,6 +87,6 @@ app.UseMiddleware<GlobalExceptionMiddleWare>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHub<ChatHub>(Options.HubPath);
-//app.MapControllers();
+app.MapControllers();
 
 app.Run();

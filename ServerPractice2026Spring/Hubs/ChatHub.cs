@@ -116,7 +116,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
     [AllowAnonymous]
     public async Task<Response> Authorize(string login, string password)
     {
-        var passHash = SHA3_256.HashData(Encoding.UTF8.GetBytes(password));
+        var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
         var passHashStr = Encoding.UTF8.GetString(passHash);
         
         var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login 
@@ -141,7 +141,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
             return ToBadResponse("Login already registered", 403);
         }
         
-        var passHash = SHA3_256.HashData(Encoding.UTF8.GetBytes(password));
+        var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
         var passHashStr = Encoding.UTF8.GetString(passHash);
         var user = new User()
         {
