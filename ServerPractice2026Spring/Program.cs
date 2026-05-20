@@ -2,7 +2,7 @@ using Bogus;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using ServerPractice2026Spring.Hubs;
 using ServerPractice2026Spring.MiddleWares;
 using ServerPractice2026Spring.Model;
@@ -14,13 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
-builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<ChatDbContext>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddSignalR();
-builder.Services.AddSwaggerGen(options =>
-{
+builder.Services.AddSwaggerGen(options => {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Some API v1", Version = "v1" });
     options.AddSignalRSwaggerGen(c =>
     {
@@ -28,7 +25,7 @@ builder.Services.AddSwaggerGen(options =>
         c.AutoDiscover = AutoDiscover.MethodsAndParams;
         c.HubMethodsScan = HubMethodsScan.Default;
     });
-
+    
     options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.Http,
@@ -37,10 +34,10 @@ builder.Services.AddSwaggerGen(options =>
         Description = "JWT Authorization header using the Bearer scheme."
     });
 
-    // options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    // {
-    //     [new OpenApiSecuritySchemeReference("bearer", document)] = []
-    // });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("bearer", document)] = []
+    });
 });
 
 builder.Services.AddAuthentication(a => {
@@ -65,6 +62,8 @@ builder.Services.AddAuthentication(a => {
             ValidAudience = Options.Audience
         };
     });
+
+builder.Services.AddOpenApi();
 
 
 builder.Services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
