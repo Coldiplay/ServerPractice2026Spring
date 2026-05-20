@@ -8,4 +8,7 @@ public class Chat
 {
     public ulong Id { get; set; }
     [Required, MaxLength(80), MinLength(1)] public string Title { get; set; } = string.Empty;
+    
+    
+    public virtual ICollection<User> Users { get; set; } = [];
 }

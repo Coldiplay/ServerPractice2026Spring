@@ -19,4 +19,13 @@ public class ChatDbContext : DbContext
     {
         optionsBuilder.UseMySql(ConnectionString, ServerVersion.AutoDetect(ConnectionString));
     }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Chat>()
+            .HasMany(c => c.Users)
+            .WithMany()
+            .UsingEntity<ChatMember>();
+        base.OnModelCreating(modelBuilder);
+    }
 }

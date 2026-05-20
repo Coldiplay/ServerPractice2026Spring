@@ -2,7 +2,6 @@ using Bogus;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using Microsoft.OpenApi.Models;
 using ServerPractice2026Spring.Hubs;
 using ServerPractice2026Spring.MiddleWares;

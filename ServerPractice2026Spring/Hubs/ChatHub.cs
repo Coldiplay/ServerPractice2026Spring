@@ -42,6 +42,27 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         logger.LogInformation("{ConnectionId} pulled {count} messages from chat {chatId}", ConnectionString, messages.Length, chatId);
         return ToResponseWithData(messages);
     }
+
+    public async Task<Response> GetChats()
+    {
+        var login = GetCurrentUserLogin()!;
+        var chats = await db.Chats.Include(c => c.Users)
+            .Where(c => c.Users.Any(u => u.Login == login))
+            .Select(c => new Chat() {
+                Id = c.Id,
+                Title = c.Title,
+                Users = c.Users.Select(u => new User()
+                {
+                    Login = u.Login
+                }).ToArray(),
+            })
+            .ToArrayAsync();
+
+        logger.LogInformation("{ConnectionId} pulled {count} chats", ConnectionString, chats.Length);
+        return ToResponseWithData(chats);
+    }
+    
+    
     public async Task<Response> SendMessage(string content, ulong chatId)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -77,7 +98,6 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         return ToResponseWithData(message);
         
     }
-
     public async Task<Response> SendMessageAi(string content, ulong chatId)
     {
         var response = await SendMessage(content, chatId);
