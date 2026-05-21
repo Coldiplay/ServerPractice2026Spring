@@ -18,38 +18,41 @@ namespace ServerPractice2026Spring.Controllers
     public class AuthController(ChatDbContext db, ILogger<AuthController> logger, UserIdsHandler idHandler) : ControllerBase
     {
         private readonly SecurityKey _publicKey = KeyHelper.BuildRsaSigningKey(Options.RSA);
-
+        private string ConnectionString => HttpContext.Connection.Id;
+        
         [HttpGet]
-        [HttpPost]
-        public async Task<Response> Login(string login, string password)
+        public async Task<Response> Authorize(string login, string password)
         {
             var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
             var passHashStr = Encoding.UTF8.GetString(passHash);
-        
+            
             var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login 
                                                                && u.Password == passHashStr);
 
             if (user is null)
             {
-                logger.LogInformation("{ConnectionId} tried to log in, but failed", HttpContext.Connection.Id);
+                logger.LogInformation("{ConnectionId} tried to log in, but failed", ConnectionString);
                 return ToBadResponse("Wrong pair login/password", 401);
             }
-        
-            var token = (object)GenerateToken(user.Login, DateTimeOffset.UtcNow.AddMinutes(20));
-            logger.LogInformation("{ConnectionId} received authorize token", HttpContext.Connection.Id);
+            
+            var token = GenerateToken(user.Login, DateTimeOffset.UtcNow.AddMinutes(20));
+            logger.LogInformation("{ConnectionId} received authorize token", ConnectionString);
             return ToResponseWithData(token, "Authenticated successfully");
         }
-        
         [HttpGet]
-        [HttpPost]
         public async Task<Response> Register(string login, string password)
         {
+            if (Options.LoginExpression.IsMatch(login) || Options.PasswordExpression.IsMatch(password))
+            {
+                logger.LogInformation("{ConnectionId} tried to register, but failed because of insufficient characters in login or password", ConnectionString);
+                return ToBadResponse("Insufficient characters in login or password", 400);
+            }
             if (await db.Users.AnyAsync(u => u.Login == login))
             {
-                logger.LogInformation("{ConnectionId} tried to register, but failed because of duplicate login", HttpContext.Connection.Id);
+                logger.LogInformation("{ConnectionId} tried to register, but failed because of duplicate login", ConnectionString);
                 return ToBadResponse("Login already registered", 403);
             }
-        
+            
             var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
             var passHashStr = Encoding.UTF8.GetString(passHash);
             var user = new User()
@@ -59,7 +62,7 @@ namespace ServerPractice2026Spring.Controllers
             };
             await db.Users.AddAsync(user);
             await db.SaveChangesAsync();
-            logger.LogInformation("{ConnectionId} registered successfully under login: {login}", HttpContext.Connection.Id, login);
+            logger.LogInformation("{ConnectionId} registered successfully under login: {login}", ConnectionString, login);
             return ToResponseWithData(true, "Registered successfully");
         }
         
