@@ -42,7 +42,7 @@ namespace ServerPractice2026Spring.Controllers
         [HttpGet]
         public async Task<Response> Register(string login, string password)
         {
-            if (Options.LoginExpression.IsMatch(login) || Options.PasswordExpression.IsMatch(password))
+            if (!Options.LoginExpression.IsMatch(login) || !Options.PasswordExpression.IsMatch(password))
             {
                 logger.LogInformation("{ConnectionId} tried to register, but failed because of insufficient characters in login or password", ConnectionString);
                 return ToBadResponse("Insufficient characters in login or password", 400);
