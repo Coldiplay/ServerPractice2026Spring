@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace ServerPractice2026Spring.Tools;
 
 internal static class Options
@@ -25,6 +27,9 @@ internal static class Options
     internal static readonly string RSA;
     internal static readonly string Issuer;
     internal static readonly string Audience;
+
+    internal static readonly Regex LoginExpression = new Regex("^[a-zA-Z][a-zA-Z0-9]{3,37}$");
+    internal static readonly Regex PasswordExpression = new Regex("^[a-zA-Z0-9]{5,32}$");
 
     internal const string HubName = "chatHub";
     internal const string HubPath = "/chatHub";
