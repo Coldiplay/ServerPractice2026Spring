@@ -194,7 +194,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
 
         if (memberLogins is not null && memberLogins.Contains(userLogin))
         {
-            memberLogins[memberLogins.IndexOf(userLogin)] = "";
+            memberLogins = memberLogins.Where(u => u != userLogin).ToArray();
         }
         
         if (memberLogins is null || memberLogins.Length == 0)
