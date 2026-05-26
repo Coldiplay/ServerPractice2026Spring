@@ -2,8 +2,6 @@ using System.Collections;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using Bogus;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -112,53 +110,6 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         }
         return response;
     }
-
-    [AllowAnonymous]
-    public async Task<Response> Authorize(string login, string password)
-    {
-        var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        var passHashStr = Encoding.UTF8.GetString(passHash);
-        
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login 
-                                                           && u.Password == passHashStr);
-
-        if (user is null)
-        {
-            logger.LogInformation("{ConnectionId} tried to log in, but failed", ConnectionString);
-            return ToBadResponse("Wrong pair login/password", 401);
-        }
-        
-        var token = GenerateToken(user.Login, DateTimeOffset.UtcNow.AddMinutes(20));
-        logger.LogInformation("{ConnectionId} received authorize token", ConnectionString);
-        return ToResponseWithData(token, "Authenticated successfully");
-    }
-    [AllowAnonymous]
-    public async Task<Response> Register(string login, string password)
-    {
-        if (Options.LoginExpression.IsMatch(login) || Options.PasswordExpression.IsMatch(password))
-        {
-            logger.LogInformation("{ConnectionId} tried to register, but failed because of insufficient characters in login or password", ConnectionString);
-            return ToBadResponse("Insufficient characters in login or password", 400);
-        }
-        if (await db.Users.AnyAsync(u => u.Login == login))
-        {
-            logger.LogInformation("{ConnectionId} tried to register, but failed because of duplicate login", ConnectionString);
-            return ToBadResponse("Login already registered", 403);
-        }
-        
-        var passHash = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        var passHashStr = Encoding.UTF8.GetString(passHash);
-        var user = new User()
-        {
-            Login = login,
-            Password = passHashStr,
-        };
-        await db.Users.AddAsync(user);
-        await db.SaveChangesAsync();
-        logger.LogInformation("{ConnectionId} registered successfully under login: {login}", ConnectionString, login);
-        return ToResponseWithData(true, "Registered successfully");
-    }
-
     
     public async Task<Response> CreateChat(string chatTitle, string[]? memberLogins = null)
     {
@@ -247,7 +198,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         for (int i = 0; i < logins.Count; i++)
         {
             if (!await db.Users.AnyAsync(u => u.Login == logins[i])
-                && await db.ChatMembers.AnyAsync(c => c.UserLogin == logins[i] && c.ChatId == chatId))
+                || await db.ChatMembers.AnyAsync(c => c.UserLogin == logins[i] && c.ChatId == chatId))
             {
                 loginsToRemove.Add(logins[i]);
                 continue;
