@@ -4,42 +4,42 @@ namespace ServerPractice2026Spring.Tools;
 
 public class UserIdsHandler
 {
-    private readonly ConcurrentDictionary<string, List<Guid>> _userIds = [];
+    private readonly ConcurrentDictionary<string, List<string>> _userIds = [];
 
-    public bool Add(string userLogin, Guid id)
+    public bool Add(string userLogin, string connectionId)
     {
         if (_userIds.ContainsKey(userLogin))
         {
             _userIds.TryGetValue(userLogin, out var connectionIds);
-            connectionIds?.Add(id);
+            connectionIds?.Add(connectionId);
         }
         else
         {
-            _userIds.TryAdd(userLogin, [id]);
+            _userIds.TryAdd(userLogin, [connectionId]);
         }
         
         return true;
     }
 
-    public bool Remove(Guid? connectionId)
+    public bool Remove(string? connectionId)
     {
         if (connectionId is null) return false;
-        var pair = _userIds.FirstOrDefault(x => x.Value.Contains((Guid)connectionId));
+        var pair = _userIds.FirstOrDefault(x => x.Value.Contains(connectionId));
         if (pair.Key is null) return true;
-        pair.Value.Remove((Guid)connectionId);
+        pair.Value.Remove(connectionId);
         if (pair.Value.Count == 0)
             _userIds.TryRemove(pair.Key, out _);
         return true;
     }
 
-    public string? GetLogin(Guid? id)
+    public string? GetLogin(string? connectionId)
     {
-        return id is null 
+        return connectionId is null 
             ? null 
-            : _userIds.FirstOrDefault(x => x.Value.Contains((Guid)id)).Key;
+            : _userIds.FirstOrDefault(x => x.Value.Contains(connectionId)).Key;
     }
 
-    public List<Guid>? GetConnectionIds(string? login)
+    public List<string>? GetConnectionIds(string? login)
     {
         return string.IsNullOrEmpty(login) 
             ? null 
