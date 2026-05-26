@@ -21,7 +21,9 @@ namespace ServerPractice2026Spring.Hubs;
 public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, ILogger<ChatHub> logger) : Hub
 {
     private readonly SecurityKey _publicKey = KeyHelper.BuildRsaSigningKey(Options.RSA);
-    private string ConnectionString => GetCurrentConnectionId().ToString() ?? $"Unauthorized connection ({Context.ConnectionId})";
+    private string ConnectionString => GetCurrentUserLogin() is not null 
+        ? $"{Context.ConnectionId}" 
+        : $"Unauthorized connection ({Context.ConnectionId})";
     
     public async Task<Response> GetMessages(ulong chatId)
     {
@@ -139,7 +141,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         {
             foreach (var connection in connections)
             {
-                await Groups.AddToGroupAsync(connection.ToString(), chat.Id.ToString());
+                await Groups.AddToGroupAsync(connection, chat.Id.ToString());
             }
         }
 
@@ -170,7 +172,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
             if (memberConnections is null || memberConnections.Count == 0) continue;
             foreach (var connection in memberConnections)
             {
-                await Groups.AddToGroupAsync(connection.ToString(), chat.Id.ToString());
+                await Groups.AddToGroupAsync(connection, chat.Id.ToString());
             }
         }
 
@@ -244,57 +246,23 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
         
         foreach (var userLogin in userLogins)
         {
-            var userIds = idHandler.GetConnectionIds(userLogin);
-            if (userIds is null) continue;
-            var userId = faker.PickRandom(userIds).ToString();
-            
-            var user = Clients.User(userId);
+            var user = Clients.User(userLogin);
             
             var messages = await db.Messages
                 .Where(m => m.ChatId == chatId)
                 .OrderByDescending(m => m.Timestamp)
                 .Take(faker.Random.Byte(20, 30))
-                .ToListAsync();
-            logger.LogInformation("Sending {count} messages to {ConnectionId}", messages.Count, userId);
+                .ToArrayAsync();
+            logger.LogInformation("Sending {count} messages to {login}", messages.Length, userLogin);
             await user.SendAsync("GenerateResponse", messages);
-            logger.LogInformation("Sent {count} messages to {ConnectionId}", messages.Count, userId);
+            logger.LogInformation("Sent {count} messages to {login}", messages.Length, userLogin);
             break;
         }
     }
     
-    private string GenerateToken(string userLogin, DateTimeOffset expiry)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var guid = Guid.NewGuid();
-        
-        var identity = new ClaimsIdentity([
-            new Claim("GUID", guid.ToString())
-        ]);
-        idHandler.Add(userLogin, guid);
-
-        var token = new JwtSecurityToken
-        (
-            Options.Issuer,
-            Options.Audience,
-            identity.Claims,
-            DateTimeOffset.UtcNow.UtcDateTime,
-            expiry.UtcDateTime,
-            new SigningCredentials(_publicKey, SecurityAlgorithms.RsaSha256,
-                SecurityAlgorithms.Sha256Digest)
-        );
-        var tokenString = tokenHandler.WriteToken(token);
-        return tokenString;
-    }
     private string? GetCurrentUserLogin()
     {
-        return idHandler.GetLogin(GetCurrentConnectionId());
-    }
-    private Guid? GetCurrentConnectionId()
-    {
-        var id = Context.User?.Claims.FirstOrDefault(c => c.Type == "GUID")?.Value;
-        return Guid.TryParse(id, out var guid)
-            ? guid
-            : null;
+        return Context.User?.Claims.FirstOrDefault(c => c.Type == "Login")?.Value;
     }
 
     private async Task AddRangeToGroup(string[] logins, string groupName)
@@ -306,7 +274,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
             if (connections is null) continue;
             foreach (var connection in connections)
             {
-                await Groups.AddToGroupAsync(connection.ToString(), groupName);
+                await Groups.AddToGroupAsync(connection, groupName);
                 logger.LogInformation("Connection {ConnectionId} added to group {groupName}", connection, groupName);
             }
         }
@@ -350,19 +318,18 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
     [ApiExplorerSettings(IgnoreApi = true)]
     public override async Task OnConnectedAsync()
     {
-        var connectionId = GetCurrentConnectionId().ToString();
-        if (!string.IsNullOrEmpty(connectionId))
+        var login = GetCurrentUserLogin();
+        if (!string.IsNullOrEmpty(login))
         {
-            var login = idHandler.GetLogin(Guid.Parse(connectionId!));
             var chatIdsWhereUserIn = await db.ChatMembers
                 .Where(c => c.UserLogin == login)
                 .Select(c => c.ChatId)
                 .ToArrayAsync();
 
-            logger.LogInformation("{ConnectionId} logged in. Starting to add them to {count} groups", connectionId, chatIdsWhereUserIn.Length);
+            logger.LogInformation("{ConnectionId} logged in. Starting to add them to {count} groups", ConnectionString, chatIdsWhereUserIn.Length);
             foreach (var chatId in chatIdsWhereUserIn)
             {
-                await Groups.AddToGroupAsync(connectionId, chatId.ToString());
+                await Groups.AddToGroupAsync(Context.ConnectionId, chatId.ToString());
             }    
         }
         
@@ -372,8 +339,7 @@ public class ChatHub(ChatDbContext db, Faker faker, UserIdsHandler idHandler, IL
     [ApiExplorerSettings(IgnoreApi = true)]
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var connectionId = GetCurrentConnectionId();
-        idHandler.Remove(connectionId);
+        idHandler.Remove(Context.ConnectionId);
         
         await base.OnDisconnectedAsync(exception);
     }

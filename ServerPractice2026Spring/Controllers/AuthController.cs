@@ -15,7 +15,7 @@ namespace ServerPractice2026Spring.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class AuthController(ChatDbContext db, ILogger<AuthController> logger, UserIdsHandler idHandler) : ControllerBase
+    public class AuthController(ChatDbContext db, ILogger<AuthController> logger) : ControllerBase
     {
         private readonly SecurityKey _publicKey = KeyHelper.BuildRsaSigningKey(Options.RSA);
         private string ConnectionString => HttpContext.Connection.Id;
@@ -69,12 +69,10 @@ namespace ServerPractice2026Spring.Controllers
         private string GenerateToken(string userLogin, DateTimeOffset expiry)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var guid = Guid.NewGuid();
-        
+            
             var identity = new ClaimsIdentity([
-                new Claim("GUID", guid.ToString())
+                new Claim("Login", userLogin)
             ]);
-            idHandler.Add(userLogin, guid);
 
             var token = new JwtSecurityToken
             (

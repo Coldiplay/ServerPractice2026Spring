@@ -6,6 +6,6 @@ public class CustomUserIdProvider : IUserIdProvider
 {
     public string? GetUserId(HubConnectionContext connection)
     {
-        return connection.User.Claims.FirstOrDefault(c => c.Type == "GUID")?.Value;
+        return connection.User.Claims.FirstOrDefault(c => c.Type == "Login")?.Value;
     }
 }
